@@ -1,2 +1,4 @@
 venv/
 Dataset/
+static/out/
+static/upload/
