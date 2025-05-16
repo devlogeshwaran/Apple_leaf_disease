@@ -1,4 +1,9 @@
 venv/
 Dataset/
-static/out/
+static/Out/
 static/upload/
+.python-version
+__pycache__/
+*.pyc
+*.pyo
+uv.lock

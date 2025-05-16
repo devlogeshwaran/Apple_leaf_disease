@@ -5,6 +5,8 @@ import mysql.connector
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'aaa'
 
+conn = mysql.connector.connect(user='root', password='admin', host='localhost', database='2citrustdb')
+cur = conn.cursor()
 
 @app.route('/')
 def home():
@@ -28,18 +30,14 @@ def NewFarmer():
 
 @app.route("/AdminHome")
 def AdminHome():
-    conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM regtb  ")
+    cur.execute("SELECT * FROM regtb")
     data = cur.fetchall()
     return render_template('AdminHome.html', data=data)
 
 
 @app.route("/AFarmerInfo")
 def AFarmerInfo():
-    conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM farmertb  ")
+    cur.execute("SELECT * FROM farmertb ")
     data = cur.fetchall()
     return render_template('AFarmerInfo.html', data=data)
 
@@ -49,9 +47,7 @@ def adminlogin():
     if request.method == 'POST':
         if request.form['uname'] == 'admin' and request.form['password'] == 'admin':
 
-            conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
-            cur = conn.cursor()
-            cur.execute("SELECT * FROM regtb ")
+            cur.execute("SELECT * FROM regtb;")
             data = cur.fetchall()
             flash("Login successfully")
             return render_template('AdminHome.html', data=data)
@@ -71,10 +67,11 @@ def newfarmer():
         uname = request.form['uname']
         password = request.form['password']
 
-        conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO farmertb VALUES ('','" + name + "','" + mobile + "','" + email + "','" + address + "','" + uname + "','" + password + "')")
+        "INSERT INTO farmertb (name, mobile, email, address, username, password) VALUES (%s, %s, %s, %s, %s, %s)",
+        (name, mobile, email, address, uname, password)
+    )
         conn.commit()
         conn.close()
         flash('User Register successfully')
@@ -87,8 +84,6 @@ def flogin():
         username = request.form['uname']
         password = request.form['password']
         session['fname'] = request.form['uname']
-
-        conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
         cursor = conn.cursor()
         cursor.execute("SELECT * from farmertb where username='" + username + "' and Password='" + password + "'")
         data = cursor.fetchone()
@@ -100,8 +95,6 @@ def flogin():
 
             session['mob'] = data[2]
 
-            conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
-            cur = conn.cursor()
             cur.execute("SELECT * FROM farmertb where username='" + username + "' and Password='" + password + "'")
             data = cur.fetchall()
             flash("Login successfully")
@@ -111,8 +104,6 @@ def flogin():
 @app.route("/FarmerHome")
 def FarmerHome():
     fname = session['fname']
-    conn = mysql.connector.connect(user='root', password='', host='localhost', database='2citrustdb')
-    cur = conn.cursor()
     cur.execute("SELECT * FROM farmertb where UserName='" + fname + "'  ")
     data = cur.fetchall()
     return render_template('FarmerHome.html', data=data)
@@ -277,7 +268,7 @@ def pred():
 def pred1():
     if request.method == 'POST':
         input = request.body
-
+        print(input)
         return render_template('Predict.html')
 
 

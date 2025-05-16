@@ -188,7 +188,7 @@
 
             <!-- Location Inputs (Manual or Auto) -->
             <h5><strong>Location (For Weather Data)</strong></h5>
-            <input type="text" name="latitude" id="latitude" class="form-control my-2" placeholder="Latitude (e.g. 11.12345)" required>
+            <input type="text" name="latitude" id="latitude" class="form-control my-2" placeholder="Latitude (e.g. 11.12345)" required >
             <input type="text" name="longitude" id="longitude" class="form-control my-2" placeholder="Longitude (e.g. 77.12345)" required>
 
             <button type="button" onclick="getLocation()" class="btn btn-success btn-style mb-3">Get Current Location</button>
@@ -205,17 +205,24 @@
 <!-- JavaScript to get current location -->
 <script>
     function getLocation() {
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(function(position) {
-                document.getElementById('latitude').value = position.coords.latitude.toFixed(5);
-                document.getElementById('longitude').value = position.coords.longitude.toFixed(5);
-            }, function(error) {
-                alert("Unable to access location. Please enter manually.");
-            });
-        } else {
-            alert("Geolocation not supported by your browser.");
-        }
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            // Get the current latitude and longitude
+            var latitude = position.coords.latitude.toFixed(5);
+            var longitude = position.coords.longitude.toFixed(5);
+
+            // Update the form fields with the latitude and longitude
+            document.getElementById('latitude').value = latitude;
+            document.getElementById('longitude').value = longitude;
+        }, function(error) {
+            // If the user denied access or an error occurred
+            alert("Unable to access location. Please enter manually.");
+        });
+    } else {
+        alert("Geolocation is not supported by this browser.");
     }
+}
+
 
     function getSoilData() {
         if (navigator.geolocation) {
