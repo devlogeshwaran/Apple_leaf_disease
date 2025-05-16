@@ -276,6 +276,8 @@ def pred():
 @app.route("/pred1", methods=['GET', 'POST'])
 def pred1():
     if request.method == 'POST':
+        input = request.body
+
         return render_template('Predict.html')
 
 
