@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, session, flash, send_file
-
+from datetime import datetime
 import mysql.connector
 
 app = Flask(__name__)
@@ -84,6 +84,7 @@ def flogin():
         username = request.form['uname']
         password = request.form['password']
         session['fname'] = request.form['uname']
+        conn = mysql.connector.connect(user='root', password='admin', host='localhost', database='2citrustdb')
         cursor = conn.cursor()
         cursor.execute("SELECT * from farmertb where username='" + username + "' and Password='" + password + "'")
         data = cursor.fetchone()
@@ -267,10 +268,266 @@ def pred():
 @app.route("/pred1", methods=['GET', 'POST'])
 def pred1():
     if request.method == 'POST':
-        input = request.body
-        print(input)
         return render_template('Predict.html')
 
+@app.route("/FertilizerPesticideRecommendation", methods=["GET","POST"])
+def Recommending_fertPest():
+    if request.method == 'GET':
+        return render_template('FertPestRecommend.html')
+    if request.method == 'POST':
+        # Get form data
+        soil_ph = request.form['soil_ph']
+        soil_npk = request.form['soil_npk']
+        latitude = request.form['latitude']
+        longitude = request.form['longitude']
+
+    weather_data = {}
+    if latitude and longitude:
+        try:
+            # Open-Meteo API (no key required)
+            weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m"
+            response = requests.get(weather_url)
+            if response.status_code == 200:
+                raw_data = response.json()
+                weather_data = {
+                    "temp": raw_data.get("current", {}).get("temperature_2m", 20),
+                    "humidity": raw_data.get("current", {}).get("relative_humidity_2m", 50)
+                }
+        except Exception as e:
+            print(f"Error fetching weather data: {e}")
+            weather_data = {"temp": 20, "humidity": 50}
+
+    # Generate recommendations based on soil and weather conditions
+    fertilizer_recommendations = get_fertilizer_recommendations(soil_ph, soil_npk, weather_data)
+    pesticide_recommendations = get_pesticide_recommendations(soil_ph, soil_npk, weather_data)
+
+
+    return render_template(
+        'FertPestResults.html',
+        soil_ph=soil_ph,
+        soil_npk=soil_npk,
+        fertilizer_recommendations=fertilizer_recommendations,
+        pesticide_recommendations=pesticide_recommendations,
+        weather=weather_data
+    )
+
+
+def get_fertilizer_recommendations(soil_ph, soil_npk, weather_data):
+    """Generate fertilizer recommendations for apple farming based on soil health and weather data."""
+    recommendations = {
+        'primary': '',
+        'secondary': '',
+        'application_method': '',
+        'timing': '',
+        'organic_options': []
+    }
+
+    # Extract season if weather data is available
+    season = "spring"  # Default
+    if weather_data and 'main' in weather_data:
+        temp = weather_data.get('temp', 20)
+        month = datetime.now().month
+
+        if 3 <= month <= 5:  # Spring
+            season = "spring"
+        elif 6 <= month <= 8:  # Summer
+            season = "summer"
+        elif 9 <= month <= 11:  # Fall
+            season = "fall"
+        else:  # Winter
+            season = "winter"
+
+    # Process soil pH
+    if "Strongly Acidic" in soil_ph:
+        recommendations[
+            'primary'] = "Apple trees prefer slightly acidic soil. Apply dolomitic lime (calcium magnesium carbonate) to raise pH gradually."
+        recommendations['organic_options'].append(
+            "Wood ash (1-2 kg per tree applied in a ring around the tree but not touching the trunk)")
+
+    elif "Moderately Acidic" in soil_ph:
+        recommendations[
+            'primary'] = "This pH range is ideal for apple trees. Maintain with regular organic matter additions."
+        recommendations['organic_options'].append("Well-composted manure or leaf mold (5-10 kg per tree annually)")
+
+    elif "Neutral" in soil_ph:
+        recommendations[
+            'primary'] = "This pH is acceptable for apple trees but slightly higher than ideal. Monitor nutrients carefully."
+        recommendations['organic_options'].append(
+            "Pine needle mulch or coffee grounds can help maintain slight acidity")
+
+    elif "Slightly Alkaline" in soil_ph:
+        recommendations[
+            'primary'] = "This pH is higher than ideal for apples. Apply elemental sulfur to gradually lower pH."
+        recommendations['organic_options'].append("Elemental sulfur (100-200g per tree) applied in early spring")
+        recommendations['organic_options'].append("Conifer needles or oak leaf mulch to help acidify soil gradually")
+
+    elif "Strongly Alkaline" in soil_ph:
+        recommendations[
+            'primary'] = "This pH is too high for optimal apple growth. Apply elemental sulfur and incorporate peat moss or composted pine bark into soil."
+        recommendations['organic_options'].append("Elemental sulfur (200-300g per tree) applied in early spring")
+        recommendations['organic_options'].append("Ferrous sulfate as a foliar spray (2-5g per liter of water)")
+
+    # Process NPK levels
+    if "Low N" in soil_npk:
+        recommendations[
+            'secondary'] = "Nitrogen deficiency detected. Apply nitrogen-rich fertilizers split into multiple applications."
+        recommendations['organic_options'].append("Blood meal (12% N): 0.5-1 kg per tree")
+        recommendations['organic_options'].append("Alfalfa meal (4% N): 2-3 kg per tree")
+        recommendations['organic_options'].append(
+            "Fish emulsion (5% N): 500ml diluted in 10L water, applied monthly during growing season")
+
+    elif "Medium N" in soil_npk:
+        if season == "spring":
+            recommendations[
+                'secondary'] = "Moderate nitrogen appropriate for vegetative growth. Apply balanced organic fertilizer."
+            recommendations['organic_options'].append("Compost tea application bi-weekly")
+            recommendations['organic_options'].append("Balanced organic fertilizer (5-5-5): 1-2 kg per tree")
+
+    elif "High N" in soil_npk:
+        recommendations[
+            'secondary'] = "Nitrogen levels are high. Avoid additional nitrogen fertilizers this season to prevent excessive vegetative growth at the expense of fruiting."
+        recommendations['organic_options'].append("Apply potassium and phosphorus-rich amendments to balance nutrients")
+        recommendations['organic_options'].append("Rock phosphate: 1-2 kg per tree")
+        recommendations['organic_options'].append("Greensand or wood ash for potassium: 1 kg per tree")
+
+    # Application methods based on season
+    if season == "spring":
+        recommendations[
+            'application_method'] = "Apply fertilizers in a ring around the tree at the drip line, not touching the trunk. Water thoroughly after application."
+        recommendations[
+            'timing'] = "Apply main fertilizer dose when buds begin to swell, with follow-up applications every 4-6 weeks through June."
+
+    elif season == "summer":
+        recommendations[
+            'application_method'] = "Apply light foliar feeds during fruit development phase. Avoid heavy nitrogen application."
+        recommendations[
+            'timing'] = "Apply calcium foliar sprays every 2-3 weeks to prevent bitter pit in developing fruit."
+        recommendations['organic_options'].append("Seaweed extract foliar spray: 5ml per liter of water")
+        recommendations['organic_options'].append("Calcium chloride foliar spray: 5g per liter of water")
+
+    elif season == "fall":
+        recommendations[
+            'application_method'] = "Apply amendments after harvest but before ground freezes. Focus on soil building for next season."
+        recommendations[
+            'timing'] = "Apply compost and slow-release amendments in October/November to build soil for spring."
+        recommendations['organic_options'].append("Compost: 5-10cm layer spread under the canopy")
+        recommendations['organic_options'].append("Cover crop seeding: white clover or winter rye")
+
+    elif season == "winter":
+        recommendations[
+            'application_method'] = "Focus on planning and soil testing rather than application during dormant period."
+        recommendations['timing'] = "Plan for early spring applications when soil thaws."
+
+    return recommendations
+
+
+def get_pesticide_recommendations(soil_ph, soil_npk, weather_data):
+    """Generate pesticide recommendations for apple farming based on soil health and weather data."""
+    recommendations = {
+        'preventative': [],
+        'pest_specific': [],
+        'disease_specific': [],
+        'application_tips': '',
+        'organic_options': []
+    }
+
+    # Extract weather conditions if available
+    humidity = 50  # Default moderate humidity
+    temp = 20  # Default moderate temperature
+    if weather_data:
+        humidity = weather_data.get('humidity', 50)
+        temp = weather_data.get('temp', 20)
+
+    # Preventative measures (always recommended)
+    recommendations['preventative'] = [
+        "Maintain orchard sanitation by removing fallen leaves and fruit",
+        "Prune trees annually to improve air circulation and light penetration",
+        "Install sticky traps to monitor pest populations",
+        "Encourage beneficial insects with companion planting (yarrow, dill, fennel)"
+    ]
+
+    # Pest-specific recommendations based on season and conditions
+    month = datetime.now().month
+
+    # Spring recommendations (bud break through bloom)
+    if 3 <= month <= 5:
+        recommendations['pest_specific'] = [
+            "Apply dormant oil before bud break to smother overwintering insects and eggs",
+            "Monitor for apple aphids and apply insecticidal soap if detected",
+            "Install codling moth traps at bloom time"
+        ]
+
+        recommendations['disease_specific'] = [
+            "Apply copper or sulfur fungicide before bud break for apple scab prevention",
+            "Begin fire blight prevention during bloom if conditions are warm and humid"
+        ]
+
+        if humidity > 70:
+            recommendations['disease_specific'].append(
+                "Increase fungicide application frequency for apple scab due to high humidity conditions"
+            )
+
+    # Summer recommendations (post-bloom through fruit development)
+    elif 6 <= month <= 8:
+        recommendations['pest_specific'] = [
+            "Monitor for codling moth and apply targeted controls 10 days after peak moth flight",
+            "Check for apple maggot fly and hang red sticky traps",
+            "Scout for spider mites during hot, dry periods"
+        ]
+
+        recommendations['disease_specific'] = [
+            "Continue fungicide program for summer diseases like sooty blotch and flyspeck",
+            "Monitor for cedar apple rust if cedar trees are in vicinity"
+        ]
+
+        if temp > 25 and humidity < 50:
+            recommendations['pest_specific'].append(
+                "Increase monitoring for spider mites due to hot, dry conditions favorable for their development"
+            )
+
+    # Fall recommendations (harvest and post-harvest)
+    elif 9 <= month <= 11:
+        recommendations['pest_specific'] = [
+            "Apply trunk guards to prevent rodent damage in winter",
+            "Clean up all dropped fruit to prevent pest overwintering"
+        ]
+
+        recommendations['disease_specific'] = [
+            "Apply one final fungicide spray after harvest to reduce disease pressure next season",
+            "Remove any cankers or diseased branches during fall cleanup"
+        ]
+
+    # Winter recommendations (dormant season)
+    else:
+        recommendations['pest_specific'] = [
+            "Apply winter oil spray during dormant period to control overwintering pests",
+            "Check rodent guards and fencing"
+        ]
+
+        recommendations['disease_specific'] = [
+            "Prune out fire blight cankers and other diseased wood during dormancy",
+            "Plan spray schedule for coming season based on previous year's disease pressure"
+        ]
+
+    # Organic pesticide options
+    recommendations['organic_options'] = [
+        "Neem oil: 5-10ml per liter of water for insect pests",
+        "Bacillus thuringiensis (Bt): For caterpillar control including codling moth",
+        "Insecticidal soap: For soft-bodied insects like aphids and mites",
+        "Kaolin clay: As a protective barrier against insects and sunburn",
+        "Spinosad: For leafroller and codling moth control",
+        "Sulfur or copper-based fungicides: For disease prevention (use according to organic standards)"
+    ]
+
+    # Application tips
+    recommendations['application_tips'] = (
+        "Apply sprays in early morning or evening to avoid harming beneficial insects. "
+        "Ensure complete coverage including leaf undersides. "
+        "Always follow product instructions for organic certification requirements. "
+        "Rotate organic pesticides to prevent resistance development."
+    )
+
+    return recommendations
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=True)
